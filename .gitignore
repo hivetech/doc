@@ -1,0 +1,10 @@
+# Designer stuff
+*.svg
+
+# Temporary
+okdoc
+*-doc
+
+# Secrets
+.env
+.envrc

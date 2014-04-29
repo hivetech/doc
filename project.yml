@@ -1,0 +1,31 @@
+title: Unide Doc
+author: Xavier Bruhiere
+keywords: development, collaborative, docker
+name: unide
+description: |
+  Develop like a hero.
+  The best of open sources techs into smart and collaborative development
+  environments
+copyright: 2014 Hive Tech S.A.S
+
+#TODO A script to add author informations at the end of the articles ?
+links:
+  domain: doc.unide.co
+  home: https://github.com/hivetech/hivy
+  blog: http://hivetech.github.io
+  about: www.google.com
+  signup: http://unide.co
+  # TODO: This is unide.co build
+  wercker_build: d12a18aecefa4e661628b3033a3edb2a
+
+contact:
+  # TODO This is intuition comments
+  disqus_shortname: quantrade
+  chat: https://gitter.im/hivetech
+  twitter: XavierBruhiere
+  support_email: xavier.bruhiere@gmail.com
+  google_plus: 102223911365852726392
+
+github:
+  user: hivetech
+  repo: hivy
