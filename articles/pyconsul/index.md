@@ -33,8 +33,8 @@ $ (sudo) pip install pyconsul
 
 ## Getting started
 
-I strongly advise you to go through [the official Consul documentation][4]
-before playing around with pyconsul.
+You should probably become familiar with [the official Consul documentation][4]
+before playing around with pyconsul, and [the HTTP API][5] especially.
 
 First, we need an agent in server mode.
 
@@ -46,35 +46,197 @@ consul agent -server -bootstrap \
   -bind=0.0.0.0
 ```
 
-Optionally, on different hosts, launch more consul agents in client mode.
+Optionally, on different hosts, we launch more consul agents in client mode.
 
 ```console
 $ # Replace with the address provided above to `--client`
 $ consul agent --join 192.168.0.19 -data-dir /tmp/consul
 ```
 
-Then you can interact with them it.
+Then we can interact with them.
+
+
+### High level usage
 
 ```python
 from pyconsul.http import Consul
 
 # `host` meets `-client <host>` arg of consul (default to 127.0.0.1)
 consul_ = Consul(host='0.0.0.0', port=8500)
-print consul_.status
-print consul_.health(node='agent-one')
 
-# Access key / value storage
-consul_.set('node/name', 'test')
-print consul_.storage.get('node/name')
-consul_.storage.delete('node/name')
+consul_.status
+# {'leader': u'192.168.0.19:8300', 'peers': [u'192.168.0.19:8300']}
+# Or invidually
+consul_.status, consul_.peers
 
-# Or manage local agent (incomplete)
-print consul_.local_agent.members
-print consul_.local_agent.services
-consul_.local_agent.join('172.17.0.3')
+# Get cluster topology
+consul_.datacenters
+# [u'dc1']
+consul_.nodes
+# [
+#   {u'Address': u'192.168.0.19', u'Node': u'agent-one'},
+#   {u'Address': u'172.17.0.3', u'Node': u'sandbox'}
+# ]
+consul_.services
+{u'consul': None}
+
+# Or inspect specific nodes and services
+consul_.node('agent-one')
+# {
+#   u'Node': {u'Address': u'192.168.0.19', u'Node': u'agent-one'},
+#   u'Services': {
+#       u'consul': {
+#           u'ID': u'consul',
+#           u'Port': 8300,
+#           u'Service': u'consul',
+#           u'Tags': None
+#       }
+#   }
+# }
+consul_.service('web')
+# []
 ```
 
-... in construction ...
+
+### Cluster health
+
+```python
+# We can monitor various cluster states
+
+consul_.health(node='agent-one')
+# [{u'CheckID': u'serfHealth',
+#   u'Name': u'Serf Health Status',
+#   u'Node': u'master',
+#   u'Notes': u'',
+#   u'ServiceID': u'',
+#   u'ServiceName': u'',
+#   u'Status': u'passing'}
+# ]
+# Or we can target more generally services
+# Return the ones marked as 'critical'
+consul_.health(state='critical')
+# []
+consul_.health(checks='web')
+# []
+consul_.health(service='web')
+# []
+```
+
+
+### Storage
+
+```python
+# Access key / value storage
+# `cas` and `flag` parameters are supported
+consul_.storage.set('node/name', 'test')
+# True
+
+# Under the hood, values are base64 encoded to support UTF-8
+# but pyconsul decodes it before returning
+consul_.storage.get('node/name')
+# [{
+#   u'CreateIndex': 42,
+#   u'Flags': 0,
+#   u'Key': u'node/name',
+#   u'ModifyIndex': 42,
+#   u'Value': 'test'
+# }]
+consul_.storage.delete('node/name')
+# {'success': True}
+```
+
+We can also use the storage API as a standalone object
+
+```python
+from pyconsul.http import KVStorage
+
+# KVStorage shares the same abstract constructor as Consul
+storage = KVStorage()
+# Set the key only if it doesn't already exist
+storage.set('project', 'pyconsul', cas=0)
+# [{
+#   u'CreateIndex': 49,
+#   u'Flags': 0,
+#   u'Key': u'state',
+#   u'ModifyIndex': 49,
+#   u'Value': 'pyconsul'
+# }]
+storage.set('project/doc', 'in progress', cas=0)
+# ...
+
+# Let's retrieve everything under the key `project`
+storage.get('project', recurse=True)
+# [{
+#     u'CreateIndex': 54,
+#     u'Flags': 0,
+#     u'Key': u'state/project',
+#     u'ModifyIndex': 54,
+#     u'Value': 'in construction'
+#  },
+#  {
+#     u'CreateIndex': 49,
+#     u'Flags': 0,
+#     u'Key': u'state',
+#     u'ModifyIndex': 49,
+#     u'Value': 'ok'
+# }]
+
+storage.delete('project', recurse=True)
+# {'success': True}
+storage.get('project', recurse=True)
+# {'error': 'Not Found', 'status': 404}
+```
+
+
+### Local agent
+
+Get back to our `consul_`, we can manage the agent running locally
+
+```python
+# Like we did with `storage`, the local agent is available as a standalone
+# object, sharing the same constructor
+#     agent = pyconsul.http.Agent()
+# Or as an attribute of `consul_`
+#     agent = consul_.local_agent
+
+# We can access useful attributes
+agent.members
+# [{
+#   u'Addr': u'192.168.0.19',
+#   u'DelegateCur': 4,
+#   u'DelegateMax': 4,
+#   u'DelegateMin': 2,
+#   u'Name': u'agent-one',
+#   u'Port': 8301,
+#   u'ProtocolCur': 2,
+#   u'ProtocolMax': 2,
+#   u'ProtocolMin': 1,
+#   u'Status': 1,
+#   u'Tags': {
+#     u'bootstrap': u'1',
+#     u'dc': u'dc1',
+#     u'port': u'8300',
+#     u'role': u'consul',
+#     u'vsn': u'1',
+#     u'vsn_max': u'1',
+#     u'vsn_min': u'1'
+#   }
+# }]
+agent.services
+# {}
+agent.checks
+# {}
+```
+
+We can also trigger actions.
+
+```python
+agent.join('172.17.0.3')
+# {'success': True}
+# Force 'agent-two' into 'left state'
+agent.force_leave('agent-two')
+# {'success': True}
+```
 
 
 ## License

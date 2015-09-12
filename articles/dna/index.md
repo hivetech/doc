@@ -6,7 +6,7 @@ sidebar_current: "dna"
 
 > Hacking environment genetics
 
-> By [Hive Tech](unide.co)
+> By [Hive Tech](http://unide.co)
 
 
 DNA is a community-driven compilation of dotfiles and projects, aimed
@@ -24,7 +24,8 @@ It is designed to be plugin-friendly: A new awesome, github featured
 project you discovered for your environment ? Star it and just plug
 a playbook ( / minion / recipe / manifest / script) in the plugin directory.
 
-If you are familiar with [docker](http://www.docker.io), you can test the environment:
+If you are familiar with [docker](http://www.docker.io), you can test the
+environment:
 
 ```console
 $ docker pull hivetech/lab
